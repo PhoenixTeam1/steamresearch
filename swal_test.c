@@ -6,30 +6,29 @@
 char* readKey();
 
 int main(int argc, char* argv[]) {
+	int i;
+	int index;
+	char* buffer;
+	char filename[sizeof("Data/PlayerSummaries_Exhaustive/player_summaries_10000000.json")];
 
 	// Load API Key
 	char* key = readKey();
 
 	// Some Modern API calls
-	int i;
+	swal_con* conn = swal_connect(SWAL_TYPE_BOTH, key);
+	if (!conn) {
+		printf("Connection failed\n");
+	}
 	for (i = 39723; i < 300000; i++) {
-		swal_con* conn = swal_connect(SWAL_TYPE_BOTH, key);
-		if (!conn) {
-			printf("Connection failed\n");
-			sleep(100);
-			continue;
-		}
-
-		char filename[sizeof("Data/PlayerSummaries_Exhaustive/player_summaries_10000000.json")];
-		int index = i*100;
+		index = i*100;
 		sprintf(filename, "Data/PlayerSummaries_Exhaustive/player_summaries_%08d.json", index);
 		printf("%s\n",filename);
-		char* buffer = generateIDs(1, index);
+		buffer = generateIDs(1, index);
 		swal_get_player_summaries(conn, buffer, filename);
 		free(buffer);
-		swal_disconnect(conn);
 		sleep(1);
 	}
+	swal_disconnect(conn);
 //	swal_get_friend_list(conn, "76561197961965701", "friendlist.json");
 //	swal_get_player_achievements(conn, 440, "76561197961965701", "achievements.json");
 //	swal_get_player_grouplist(conn, "76561197961965701", "grouplist.json");
