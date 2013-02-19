@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -c -Wall
+CFLAGS = -g -c -Wall
 LDFLAGS =
 SOURCES = swal_test.c swal.c
 OBJECTS = $(SOURCES:.c=.o)

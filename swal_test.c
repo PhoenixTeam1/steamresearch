@@ -2,17 +2,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/signal.h>
 
 char* readKey();
+void handler(int status);
 
 int main(int argc, char* argv[]) {
 	int i;
 	int index;
 	char* buffer;
 	char filename[sizeof("Data/PlayerSummaries_Exhaustive/player_summaries_10000000.json")];
+	struct sigaction sigold, signew;
 
 	// Load API Key
 	char* key = readKey();
+
+	// Register signal handler
+	signew.sa_handler = handler;
+	sigemptyset(&signew.sa_mask);
+	sigaddset(&signew.sa_mask, SIGPIPE);
+	signew.sa_flags = SA_RESTART;
+	sigaction(SIGPIPE, &signew, &sigold);
 
 	// Some Modern API calls
 	swal_con* conn = swal_connect(SWAL_TYPE_BOTH, key);
@@ -26,7 +36,7 @@ int main(int argc, char* argv[]) {
 		buffer = generateIDs(1, index);
 		swal_get_player_summaries(conn, buffer, filename);
 		free(buffer);
-		sleep(1);
+		usleep(1000000); // 1000000 microseconds = 1 second
 	}
 	swal_disconnect(conn);
 //	swal_get_friend_list(conn, "76561197961965701", "friendlist.json");
@@ -68,5 +78,10 @@ char* readKey() {
 
 	fclose(keyfile);
 	return key;
+}
+
+
+void handler(int status) {
+	printf("Recieved signal: %d\n", status);
 }
 

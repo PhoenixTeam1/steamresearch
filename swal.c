@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <errno.h>
 #include "swal.h"
 
 #define STEAM_WEB_API_HOSTNAME "api.steampowered.com"
@@ -342,6 +343,10 @@ int swal_execute_query(int sock, char* query, char* filename) {
 	int bytesWritten;
 	while (totalBytesWritten < bytesToWrite) {
 		bytesWritten = write(sock, query+totalBytesWritten, strlen(query)+totalBytesWritten);
+		if (bytesWritten < 0) {
+			fprintf(stderr, "Error while writing to socket: %s\n", strerror(errno));
+			exit(-1);
+		}
 		totalBytesWritten += bytesWritten;
 	}
 	success = swal_save_response(sock, filename);
@@ -362,7 +367,10 @@ int swal_execute_query(int sock, char* query, char* filename) {
   return: 1 on success, 0 on failure
 
   notes: Failure is caused by failure to save or
-  any HTTP response code other than 200 OK
+  any HTTP response code other than 200 OK.  This
+  function assumes HTTP headers will be sent
+  within first array of bytes returned from the
+  read call.  Will fix this soon.
 **************************************************/
 int swal_save_response(int sock, char* filename) {
 	char buffer[BUFLEN];
@@ -393,6 +401,10 @@ int swal_save_response(int sock, char* filename) {
 
 		else if (returnValue > 0) {
 			while ((bytesRead = read(sock, buffer, BUFLEN-1))) {
+				if (bytesRead < 0) {
+					fprintf(stderr, "Error while reading from socket: %s\n", strerror(errno));
+					exit(-1);
+				}
 				totalBytesRead += bytesRead;
 				buffer[bytesRead] = 0; // Null terminate
 				//printf("%s", buffer);
@@ -400,9 +412,15 @@ int swal_save_response(int sock, char* filename) {
 					if (strncmp(buffer, HTTP_STATUS_OK, sizeof(HTTP_STATUS_OK)-1) == 0) {
 						success = 1;
 					}
+					else {
+						fprintf(stderr, "Status code other than 200 OK sent back or no code sent at all\n");
+					}
 					if ((headerPtr = strcasestr(buffer, HTTP_CONTENT_LENGTH))) {
 						headerPtr += sizeof(HTTP_CONTENT_LENGTH)-1;
 						sscanf(headerPtr, "%d", &contentLength);
+					}
+					else {
+						fprintf(stderr, "Content length header value not sent within first %d bytes sent back\n", bytesRead);
 					}
 					if ((headerPtr = strstr(buffer, "\r\n\r\n"))) {
 						headerPtr += sizeof("\r\n\r\n")-1;
@@ -413,6 +431,9 @@ int swal_save_response(int sock, char* filename) {
 							}
 						}
 						headerLength = headerPtr - buffer;
+					}
+					else {
+						fprintf(stderr, "HTTP header end sentinel not reached within first %d bytes sent back\n", bytesRead);
 					}
 					headersParsed = 1;
 				}
